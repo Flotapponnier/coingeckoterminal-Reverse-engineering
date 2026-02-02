@@ -47,14 +47,22 @@ Reverse engineering de CoinGecko Terminal (DEX data aggregator) pour accéder au
 
 ### WebSocket
 ```
-URL: TBD
-Protocol: TBD
-Auth: TBD
+URL: wss://cables.geckoterminal.com/cable
+Protocol: AnyCable v1.6.8 (ActionCable compatible)
+Auth: Non requis (juste Origin + User-Agent headers)
+Server: Cloudflare + AnyCable
+Status: ✅ Confirmé fonctionnel
+```
+
+**Headers requis:**
+```
+Origin: https://www.geckoterminal.com
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 ```
 
 ### REST API
 ```
-Base URL: TBD
+Base URL: https://api.geckoterminal.com/api/v2/
 Auth: TBD
 ```
 

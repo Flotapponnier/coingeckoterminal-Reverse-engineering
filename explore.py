@@ -9,25 +9,26 @@ import json
 import websockets
 from datetime import datetime
 
-# URLs possibles à tester
-POSSIBLE_WS_URLS = [
-    "wss://www.geckoterminal.com/cable",
-    "wss://api.geckoterminal.com/cable",
-    "wss://cable.geckoterminal.com",
-    "wss://www.geckoterminal.com/api/cable",
-]
+# URL WebSocket confirmée
+WS_URL = "wss://cables.geckoterminal.com/cable"
+
+# Headers requis
+HEADERS = {
+    "Origin": "https://www.geckoterminal.com",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+}
 
 def log(msg):
     timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     print(f"[{timestamp}] {msg}")
 
-async def explore_websocket(url):
-    """Explore un endpoint WebSocket"""
-    log(f"Tentative de connexion à: {url}")
+async def explore_websocket():
+    """Explore le WebSocket de GeckoTerminal"""
+    log(f"Tentative de connexion à: {WS_URL}")
 
     try:
-        async with websockets.connect(url) as ws:
-            log(f"✅ Connecté à {url}")
+        async with websockets.connect(WS_URL, extra_headers=HEADERS) as ws:
+            log(f"✅ Connecté à {WS_URL}")
 
             # Test 1: Attendre un message de bienvenue
             try:
@@ -72,12 +73,10 @@ async def explore_websocket(url):
 async def main():
     log("🔍 CoinGecko Terminal WebSocket Explorer")
     log("=" * 60)
+    log(f"Server: AnyCable v1.6.8 (ActionCable compatible)")
+    log("=" * 60)
 
-    # Tester chaque URL
-    for url in POSSIBLE_WS_URLS:
-        await explore_websocket(url)
-        log("-" * 60)
-        await asyncio.sleep(2)
+    await explore_websocket()
 
     log("✅ Exploration terminée")
 

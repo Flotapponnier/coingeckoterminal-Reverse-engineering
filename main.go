@@ -13,8 +13,12 @@ import (
 
 // Configuration
 const (
-	// URL WebSocket de GeckoTerminal (ActionCable)
-	wsURL = "wss://www.geckoterminal.com/cable"
+	// URL WebSocket de GeckoTerminal (AnyCable - compatible ActionCable)
+	wsURL = "wss://cables.geckoterminal.com/cable"
+
+	// Headers
+	origin    = "https://www.geckoterminal.com"
+	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
 )
 
 // Message structures
@@ -39,9 +43,15 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// Connect to WebSocket
+	// Connect to WebSocket with headers
 	log.Printf("Connexion à %s...", wsURL)
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+
+	headers := map[string][]string{
+		"Origin":     {origin},
+		"User-Agent": {userAgent},
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, headers)
 	if err != nil {
 		log.Fatal("Erreur de connexion:", err)
 	}
