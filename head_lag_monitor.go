@@ -31,13 +31,30 @@ var monitoredPools = []struct {
 		PoolID:  "147971598",
 		Chain:   "ethereum",
 	},
-	// TODO: Add more pools once pool_id found
-	// {
-	// 	Name:    "SOL/USDC Raydium",
-	// 	Network: "solana",
-	// 	PoolID:  "TBD",
-	// 	Chain:   "solana",
-	// },
+	{
+		Name:    "SOL/USDC Raydium",
+		Network: "solana",
+		PoolID:  "162715608",
+		Chain:   "solana",
+	},
+	{
+		Name:    "WETH/USDC Base",
+		Network: "base",
+		PoolID:  "162840764",
+		Chain:   "base",
+	},
+	{
+		Name:    "WBNB/BUSD PancakeSwap",
+		Network: "bsc",
+		PoolID:  "24",
+		Chain:   "bnb",
+	},
+	{
+		Name:    "WETH/USDC Arbitrum",
+		Network: "arbitrum",
+		PoolID:  "162634438",
+		Chain:   "arbitrum",
+	},
 }
 
 // Message structures
@@ -87,6 +104,7 @@ func main() {
 	fmt.Println("🦎 GeckoTerminal Head Lag Monitor")
 	fmt.Println("=" + string(make([]byte, 60)))
 	fmt.Println("Measuring indexation latency for GeckoTerminal WebSocket")
+	fmt.Printf("Monitoring %d pools across 5 chains\n", len(monitoredPools))
 	fmt.Println()
 
 	// Initialize stats
@@ -100,7 +118,60 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// Connect to WebSocket
+	// Print stats every 30 seconds
+	statsTicker := time.NewTicker(30 * time.Second)
+	defer statsTicker.Stop()
+
+	statsQuit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-statsTicker.C:
+				printStats()
+			case <-statsQuit:
+				return
+			}
+		}
+	}()
+
+	// Auto-reconnect loop
+	reconnectDelay := 5 * time.Second
+	maxReconnectDelay := 60 * time.Second
+
+	for {
+		select {
+		case <-interrupt:
+			log.Println("\nInterrupt received, closing...")
+			close(statsQuit)
+			printStats()
+			return
+		default:
+			err := connectAndMonitor(interrupt)
+			if err != nil {
+				log.Printf("⚠️  Connection lost: %v", err)
+				log.Printf("🔄 Reconnecting in %v...", reconnectDelay)
+
+				select {
+				case <-interrupt:
+					close(statsQuit)
+					printStats()
+					return
+				case <-time.After(reconnectDelay):
+					// Exponential backoff
+					reconnectDelay = reconnectDelay * 2
+					if reconnectDelay > maxReconnectDelay {
+						reconnectDelay = maxReconnectDelay
+					}
+				}
+			} else {
+				// Clean disconnect, reset delay
+				reconnectDelay = 5 * time.Second
+			}
+		}
+	}
+}
+
+func connectAndMonitor(interrupt chan os.Signal) error {
 	log.Printf("Connecting to %s...", wsURL)
 
 	headers := map[string][]string{
@@ -110,7 +181,7 @@ func main() {
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, headers)
 	if err != nil {
-		log.Fatal("Connection error:", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer conn.Close()
 
@@ -125,7 +196,6 @@ func main() {
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("Read error:", err)
 				return
 			}
 
@@ -139,40 +209,32 @@ func main() {
 	// Subscribe to SwapChannel for all monitored pools
 	for _, pool := range monitoredPools {
 		subscribeToSwapChannel(conn, pool.PoolID, pool.Name)
+		time.Sleep(100 * time.Millisecond) // Small delay between subscriptions
 	}
 
-	// Print stats every 30 seconds
-	statsTicker := time.NewTicker(30 * time.Second)
-	defer statsTicker.Stop()
+	log.Printf("✅ Subscribed to %d pools", len(monitoredPools))
 
-	go func() {
-		for {
-			select {
-			case <-statsTicker.C:
-				printStats()
-			case <-done:
-				return
-			}
-		}
-	}()
+	// Heartbeat (ping/pong)
+	pingTicker := time.NewTicker(25 * time.Second)
+	defer pingTicker.Stop()
 
 	// Wait for interrupt or done
-	select {
-	case <-done:
-		log.Println("Connection closed")
-	case <-interrupt:
-		log.Println("\nInterrupt received, closing...")
-		printStats() // Print final stats
-
-		// Cleanly close the connection
-		err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		if err != nil {
-			log.Println("Close error:", err)
-			return
-		}
+	for {
 		select {
 		case <-done:
-		case <-time.After(time.Second):
+			return fmt.Errorf("connection closed by server")
+		case <-interrupt:
+			// Cleanly close the connection
+			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+			}
+			return nil
+		case <-pingTicker.C:
+			// Server sends pings, we respond with pongs (handled in handleMessage)
+			// Just check connection is alive
+			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		}
 	}
 }
@@ -247,15 +309,24 @@ func handleDataMessage(identifier string, message json.RawMessage) {
 	// Update stats
 	updateStats(poolChain, lagMs)
 
-	// Log
+	// Log (show all swaps for visibility)
 	timestamp := receiveTime.Format("15:04:05")
 	txHash := swapData.Data.TxHash
 	if len(txHash) > 12 {
 		txHash = txHash[:10] + "..."
 	}
 
-	fmt.Printf("[%s][GECKO][%s] Lag: %.2fs (%.0fms) | Tx: %s | Vol: $%s\n",
-		timestamp, poolChain, lagSeconds, float64(lagMs), txHash, swapData.Data.FromTokenTotalUSD[:7])
+	volume := "N/A"
+	if swapData.Data.FromTokenTotalUSD != "" && len(swapData.Data.FromTokenTotalUSD) > 2 {
+		if len(swapData.Data.FromTokenTotalUSD) > 10 {
+			volume = swapData.Data.FromTokenTotalUSD[:10]
+		} else {
+			volume = swapData.Data.FromTokenTotalUSD
+		}
+	}
+
+	fmt.Printf("[%s][GECKO][%-10s] Lag: %6.2fs | Tx: %s | Vol: $%s\n",
+		timestamp, poolChain, lagSeconds, txHash, volume)
 }
 
 func updateStats(chain string, lagMs int64) {
