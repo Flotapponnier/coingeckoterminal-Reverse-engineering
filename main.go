@@ -30,9 +30,8 @@ type ActionCableMessage struct {
 }
 
 type ChannelIdentifier struct {
-	Channel     string `json:"channel"`
-	PoolAddress string `json:"pool_address,omitempty"`
-	NetworkID   string `json:"network_id,omitempty"`
+	Channel string `json:"channel"`
+	PoolID  string `json:"pool_id,omitempty"` // Pool ID (numeric string like "147971598")
 }
 
 func main() {
@@ -86,8 +85,11 @@ func main() {
 	// Wait for welcome message
 	time.Sleep(2 * time.Second)
 
-	// Subscribe to a pool (ETH/USDC Uniswap V3 on Ethereum)
-	subscribeToPool(conn, "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640", "eth")
+	// Subscribe to pool and swaps (using pool_id from the network capture)
+	// Pool ID 147971598 corresponds to ETH/USDC pool on Ethereum
+	poolID := "147971598"
+	subscribeToPoolChannel(conn, poolID)
+	subscribeToSwapChannel(conn, poolID)
 
 	// Wait for interrupt or done
 	select {
@@ -131,13 +133,13 @@ func handleMessage(conn *websocket.Conn, msg ActionCableMessage) {
 	}
 }
 
-func subscribeToPool(conn *websocket.Conn, poolAddress, network string) {
-	log.Printf("📡 Subscription au pool %s sur %s...", poolAddress, network)
+func subscribeToPoolChannel(conn *websocket.Conn, poolID string) {
+	log.Printf("📡 Subscription à PoolChannel pour pool_id=%s...", poolID)
 
 	// Create channel identifier
 	identifier := ChannelIdentifier{
-		Channel:     "PoolChannel",
-		PoolAddress: poolAddress,
+		Channel: "PoolChannel",
+		PoolID:  poolID,
 	}
 
 	identifierJSON, _ := json.Marshal(identifier)
@@ -149,9 +151,34 @@ func subscribeToPool(conn *websocket.Conn, poolAddress, network string) {
 	}
 
 	if err := conn.WriteJSON(subscribeMsg); err != nil {
-		log.Println("Erreur subscription:", err)
+		log.Println("Erreur subscription PoolChannel:", err)
 		return
 	}
 
-	log.Println("✅ Commande de subscription envoyée")
+	log.Println("✅ Commande PoolChannel envoyée")
+}
+
+func subscribeToSwapChannel(conn *websocket.Conn, poolID string) {
+	log.Printf("📡 Subscription à SwapChannel pour pool_id=%s...", poolID)
+
+	// Create channel identifier
+	identifier := ChannelIdentifier{
+		Channel: "SwapChannel",
+		PoolID:  poolID,
+	}
+
+	identifierJSON, _ := json.Marshal(identifier)
+
+	// Create subscribe command
+	subscribeMsg := ActionCableMessage{
+		Command:    "subscribe",
+		Identifier: string(identifierJSON),
+	}
+
+	if err := conn.WriteJSON(subscribeMsg); err != nil {
+		log.Println("Erreur subscription SwapChannel:", err)
+		return
+	}
+
+	log.Println("✅ Commande SwapChannel envoyée")
 }
