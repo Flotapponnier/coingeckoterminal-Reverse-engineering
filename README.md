@@ -70,19 +70,97 @@ Auth: TBD
 
 | Subscription | Description | Status |
 |-------------|-------------|---------|
-| TBD | TBD | ⏳ |
+| **SwapChannel** | Trades/swaps en temps réel | ✅ Fonctionnel |
+| **PoolChannel** | Prix, volume, stats du pool | ✅ Fonctionnel |
+
+### SwapChannel - Données reçues
+```json
+{
+  "tx_hash": "0x...",
+  "from_token_amount": "4756.419711",
+  "to_token_amount": "2.00852662245715",
+  "price_from_in_usd": "1.00197609252112",
+  "price_to_in_usd": "2372.79346120288",
+  "block_timestamp": 1770047795000,
+  "tx_from_address": "0x...",
+  "from_token_id": 1337529,
+  "to_token_id": 1337526
+}
+```
+
+### PoolChannel - Données reçues
+```json
+{
+  "base_price_in_usd": "2372.79346120288",
+  "quote_price_in_usd": "1.00197609252112",
+  "reserve_in_usd": "66670960.6651",
+  "from_volume_in_usd": "205688356.279988",
+  "price_change_data": {
+    "last_300_s": {...},    // 5 minutes
+    "last_900_s": {...},    // 15 minutes
+    "last_1800_s": {...},   // 30 minutes
+    "last_3600_s": {...},   // 1 heure
+    "last_7200_s": {...},   // 2 heures
+    "last_21600_s": {...},  // 6 heures
+    "last_43200_s": {...},  // 12 heures
+    "last_86400_s": {...},  // 24 heures
+    "last_172800_s": {...}" // 48 heures
+  },
+  "transaction_data": {
+    "buys": 5983,
+    "sells": 5413
+  },
+  "fdv_in_usd": "5341084451.250967",
+  "market_cap_in_usd": "5339500976.10621"
+}
+```
 
 ## 🚀 Usage
 
-### Python (Exploration)
-```python
-# TBD
+### Go Client (Production Ready)
+```bash
+cd "/Users/user/mobula/reverse engineering/coingecko"
+go run main.go
 ```
 
-### Go (Production)
-```go
-// TBD
+**Sortie :**
 ```
+🦎 CoinGecko Terminal WebSocket Client
+✅ Connecté au WebSocket
+📨 Message de bienvenue reçu
+✅ Subscription confirmée: PoolChannel
+✅ Subscription confirmée: SwapChannel
+[16:56:43] Swap reçu: 4756 USDC → 2.008 WETH ($4,765)
+[16:56:43] Pool update: WETH = $2,372 | Volume 24h: $205M
+```
+
+### Python (Exploration)
+```bash
+pip install -r requirements.txt
+python3 explore.py
+```
+
+## 🔧 Prochaines Étapes
+
+### ✅ Phase 1: WebSocket (COMPLÉTÉ)
+- [x] Connexion WebSocket fonctionnelle
+- [x] SwapChannel subscription
+- [x] PoolChannel subscription
+- [x] Parsing des messages en temps réel
+
+### 🚧 Phase 2: REST API (En cours)
+- [ ] **Trouver pool_id depuis adresse de pool**
+  - Endpoint probable: `/api/v2/networks/{network}/pools/{address}`
+- [ ] Get pool info
+- [ ] Get OHLCV data
+- [ ] Get trending pools
+- [ ] Get new pools
+
+### 📋 Phase 3: Structures de données
+- [ ] Créer types Go pour SwapData
+- [ ] Créer types Go pour PoolData
+- [ ] Parser les price_change_data
+- [ ] Parser les transaction_data
 
 ## 📝 Notes
 
